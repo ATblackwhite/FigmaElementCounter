@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 20px;
+      color: #333;
+    }
+    
+    h2 {
+      margin-top: 0;
+      margin-bottom: 16px;
+      color: #333;
+    }
+    
+    button {
+      background-color: #18A0FB;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 8px;
+      font-weight: 500;
+    }
+    
+    button:hover {
+      background-color: #0D8Ae5;
+    }
+    
+    #stats {
+      margin-top: 20px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    
+    .stat-card {
+      background-color: #F5F5F5;
+      border-radius: 6px;
+      padding: 12px;
+      width: calc(33.33% - 10px);
+      box-sizing: border-box;
+    }
+    
+    .stat-card h3 {
+      margin: 0 0 5px 0;
+      font-size: 14px;
+    }
+    
+    .stat-card p {
+      margin: 0;
+      font-size: 20px;
+      font-weight: bold;
+      color: #18A0FB;
+    }
+    
+    #elements-list {
+      height: 250px;
+      overflow-y: auto;
+      border: 1px solid #E0E0E0;
+      border-radius: 6px;
+      margin-top: 10px;
+      padding: 0;
+    }
+    
+    .element-item {
+      padding: 10px;
+      border-bottom: 1px solid #E0E0E0;
+      display: flex;
+      align-items: center;
+    }
+    
+    .element-item:last-child {
+      border-bottom: none;
+    }
+    
+    .element-type {
+      font-weight: bold;
+      margin-right: 10px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    
+    .element-type.button {
+      background-color: #E91E63;
+      color: white;
+    }
+    
+    .element-type.text {
+      background-color: #2196F3;
+      color: white;
+    }
+    
+    .element-type.input {
+      background-color: #9C27B0;
+      color: white;
+    }
+    
+    .element-type.image {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .element-type.icon {
+      background-color: #FF9800;
+      color: white;
+    }
+    
+    .element-type.container {
+      background-color: #607D8B;
+      color: white;
+    }
+    
+    .element-type.scroll {
+      background-color: #673AB7;
+      color: white;
+    }
+    
+    .element-type.unknown {
+      background-color: #9E9E9E;
+      color: white;
+    }
+    
+    .element-name {
+      flex-grow: 1;
+    }
+    
+    .element-size {
+      color: #757575;
+      font-size: 12px;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #757575;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h2>Figma 元素分析器</h2>
+  <p>分析当前页面中的元素，根据交互特性进行分类</p>
+  
+  <div>
+    <button id="analyze">开始分析</button>
+    <button id="close">关闭插件</button>
+  </div>
+  
+  <div id="loading" class="loading">
+    正在分析页面元素...
+  </div>
+  
+  <div id="results" style="display: none;">
+    <h3>分析结果统计</h3>
+    <div id="stats"></div>
+    
+    <div id="scroll-summary" style="margin-top: 20px; margin-bottom: 20px; padding: 15px; background-color: #EDE7F6; border-radius: 6px;">
+      <h3 style="margin-top: 0; color: #673AB7;">滚动区域详情</h3>
+      <div id="scroll-details"></div>
+    </div>
+    
+    <h3>元素列表</h3>
+    <div id="elements-list"></div>
+  </div>
+
+  <script>
+    // 分析按钮点击事件
+    document.getElementById('analyze').onclick = () => {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('results').style.display = 'none';
+      parent.postMessage({ pluginMessage: { type: 'analyze-page' } }, '*');
+    }
+    
+    // 关闭按钮点击事件
+    document.getElementById('close').onclick = () => {
+      parent.postMessage({ pluginMessage: { type: 'close' } }, '*');
+    }
+    
+    // 接收插件主线程发送的消息
+    window.onmessage = (event) => {
+      const message = event.data.pluginMessage;
+      
+      if (message.type === 'analysis-results') {
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('results').style.display = 'block';
+        
+        // 显示统计数据
+        const statsContainer = document.getElementById('stats');
+        statsContainer.innerHTML = '';
+        
+        for (const [type, count] of Object.entries(message.stats)) {
+          const statCard = document.createElement('div');
+          statCard.className = 'stat-card';
+          
+          const typeTitle = document.createElement('h3');
+          typeTitle.textContent = type;
+          
+          const countElem = document.createElement('p');
+          countElem.textContent = count;
+          
+          statCard.appendChild(typeTitle);
+          statCard.appendChild(countElem);
+          statsContainer.appendChild(statCard);
+        }
+        
+        // 显示滚动区域详情
+        const scrollDetails = document.getElementById('scroll-details');
+        scrollDetails.innerHTML = '';
+        
+        // 筛选出所有滚动区域
+        const scrollElements = message.elements.filter(el => el.type === '滚动区域');
+        
+        if (scrollElements.length === 0) {
+          scrollDetails.innerHTML = '<p>未检测到滚动区域</p>';
+          document.getElementById('scroll-summary').style.display = 'none';
+        } else {
+          document.getElementById('scroll-summary').style.display = 'block';
+          
+          // 统计不同滚动方向的数量
+          const directionStats = {
+            '水平和垂直': 0,
+            '水平方向': 0,
+            '垂直方向': 0,
+            '名称推断': 0,
+            '未知方向': 0
+          };
+          
+          scrollElements.forEach(el => {
+            if (el.scrollDirection) {
+              directionStats[el.scrollDirection]++;
+            } else {
+              directionStats['未知方向']++;
+            }
+          });
+          
+          // 创建滚动方向统计表格
+          const table = document.createElement('table');
+          table.style.width = '100%';
+          table.style.borderCollapse = 'collapse';
+          table.style.marginBottom = '15px';
+          
+          // 添加表头
+          const thead = document.createElement('thead');
+          const headerRow = document.createElement('tr');
+          
+          const dirHeader = document.createElement('th');
+          dirHeader.textContent = '滚动方向';
+          dirHeader.style.textAlign = 'left';
+          dirHeader.style.padding = '8px';
+          dirHeader.style.borderBottom = '1px solid #ddd';
+          
+          const countHeader = document.createElement('th');
+          countHeader.textContent = '数量';
+          countHeader.style.textAlign = 'right';
+          countHeader.style.padding = '8px';
+          countHeader.style.borderBottom = '1px solid #ddd';
+          
+          headerRow.appendChild(dirHeader);
+          headerRow.appendChild(countHeader);
+          thead.appendChild(headerRow);
+          table.appendChild(thead);
+          
+          // 添加表格内容
+          const tbody = document.createElement('tbody');
+          
+          for (const [direction, count] of Object.entries(directionStats)) {
+            if (count > 0) {
+              const row = document.createElement('tr');
+              
+              const dirCell = document.createElement('td');
+              dirCell.textContent = direction;
+              dirCell.style.padding = '8px';
+              dirCell.style.borderBottom = '1px solid #eee';
+              
+              const countCell = document.createElement('td');
+              countCell.textContent = count.toString();
+              countCell.style.textAlign = 'right';
+              countCell.style.padding = '8px';
+              countCell.style.borderBottom = '1px solid #eee';
+              countCell.style.fontWeight = 'bold';
+              
+              row.appendChild(dirCell);
+              row.appendChild(countCell);
+              tbody.appendChild(row);
+            }
+          }
+          
+          table.appendChild(tbody);
+          scrollDetails.appendChild(table);
+          
+          // 添加滚动区域列表摘要
+          const scrollList = document.createElement('div');
+          scrollList.style.maxHeight = '200px';
+          scrollList.style.overflowY = 'auto';
+          
+          scrollElements.forEach((el, index) => {
+            if (index < 5) { // 只显示前5个
+              const item = document.createElement('div');
+              item.style.padding = '8px';
+              item.style.borderBottom = index < 4 ? '1px solid #eee' : 'none';
+              
+              const nameSpan = document.createElement('span');
+              nameSpan.textContent = el.name;
+              nameSpan.style.fontWeight = 'bold';
+              
+              const dirSpan = document.createElement('span');
+              dirSpan.textContent = el.scrollDirection ? ` (${el.scrollDirection})` : '';
+              dirSpan.style.color = '#673AB7';
+              
+              item.appendChild(nameSpan);
+              item.appendChild(dirSpan);
+              scrollList.appendChild(item);
+            }
+          });
+          
+          if (scrollElements.length > 5) {
+            const moreItem = document.createElement('div');
+            moreItem.style.padding = '8px';
+            moreItem.style.textAlign = 'center';
+            moreItem.style.fontStyle = 'italic';
+            moreItem.style.color = '#757575';
+            moreItem.textContent = `还有 ${scrollElements.length - 5} 个滚动区域...`;
+            scrollList.appendChild(moreItem);
+          }
+          
+          scrollDetails.appendChild(scrollList);
+        }
+        
+        // 显示元素列表
+        const elementsListContainer = document.getElementById('elements-list');
+        elementsListContainer.innerHTML = '';
+        
+        message.elements.forEach(element => {
+          const elementItem = document.createElement('div');
+          elementItem.className = 'element-item';
+          
+          const typeSpan = document.createElement('span');
+          typeSpan.className = `element-type ${element.type.toLowerCase()}`;
+          typeSpan.textContent = element.type;
+          
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'element-name';
+          nameSpan.textContent = element.name;
+          
+          const sizeSpan = document.createElement('span');
+          sizeSpan.className = 'element-size';
+          sizeSpan.textContent = `${Math.round(element.width)} × ${Math.round(element.height)}`;
+          
+          elementItem.appendChild(typeSpan);
+          elementItem.appendChild(nameSpan);
+          elementItem.appendChild(sizeSpan);
+          
+          // 如果是滚动区域，显示滚动方向
+          if (element.type === '滚动区域' && element.scrollDirection) {
+            const scrollDirSpan = document.createElement('span');
+            scrollDirSpan.className = 'scroll-direction';
+            scrollDirSpan.textContent = ` (${element.scrollDirection})`;
+            scrollDirSpan.style.color = '#673AB7';
+            scrollDirSpan.style.fontWeight = 'bold';
+            scrollDirSpan.style.marginLeft = '5px';
+            sizeSpan.appendChild(scrollDirSpan);
+          }
+          
+          elementsListContainer.appendChild(elementItem);
+        });
+      }
+    }
+  </script>
+</body>
+</html>
